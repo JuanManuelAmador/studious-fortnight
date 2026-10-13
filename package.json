@@ -10,7 +10,7 @@
     "test:prod:stable": "cross-env TEST_ENV=prod playwright test --grep-invert @bug",
     "test:bugs": "cross-env TEST_ENV=dev playwright test --grep @bug",
     "typecheck": "tsc --noEmit",
-    "allure:generate": "allure generate allure-results --clean -o allure-report",
+    "allure:generate": "allure generate allure-results --clean --single-file -o allure-report",
     "allure:open": "allure open allure-report",
     "clean": "rimraf allure-results allure-report test-results playwright-report"
   },
