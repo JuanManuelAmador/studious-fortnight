@@ -1,0 +1,107 @@
+name: API Tests
+
+on:
+  # Manual run: choose the target environment (dev | prod)
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Nightly run against PROD every day at midnight.
+  # Commented because it is not a real usage feature
+  # schedule:
+  #   - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  api-tests:
+    name: API tests (${{ inputs.environment || 'prod' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # push / pull_request run against dev; manual runs use the chosen input;
+      # the (commented) nightly schedule runs against prod.
+      TEST_ENV: ${{ inputs.environment || (github.event_name == 'schedule' && 'prod') || 'dev' }}
+      # Repository secret API_TOKEN overrides the value in tests/config/.env.<env>
+      API_TOKEN: ${{ secrets.API_TOKEN }}
+
+    services:
+      api:
+        image: ghcr.io/danielsilva-loanpro/sdet-interview-challenge
+        ports:
+          - 3000:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure environment
+        env:
+          BASE_URL_OVERRIDE: ${{ vars.BASE_URL }}
+        run: |
+          echo "BASE_URL=${BASE_URL_OVERRIDE:-http://localhost:3000/${TEST_ENV}}" >> "$GITHUB_ENV"
+          if [ -z "$API_TOKEN" ]; then
+            echo "::error::Repository secret API_TOKEN is not set (Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java (required by Allure CLI)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Wait for API to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf "http://localhost:3000/${TEST_ENV}/users" > /dev/null; then
+              echo "API is up"; exit 0
+            fi
+            echo "Waiting for API ($i/30)..."; sleep 2
+          done
+          echo "API did not become ready"; exit 1
+
+      - name: Run API tests (${{ env.TEST_ENV }})
+        run: npm run test:${{ env.TEST_ENV }}
+
+      - name: Generate Allure report
+        if: always()
+        run: npm run allure:generate
+
+      - name: Upload Allure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-${{ env.TEST_ENV }}
+          path: allure-report
+          retention-days: 14
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ env.TEST_ENV }}
+          path: allure-results
+          retention-days: 14

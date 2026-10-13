@@ -1,0 +1,13 @@
+node_modules/
+allure-results/
+allure-report/
+test-results/
+playwright-report/
+
+# Environment files (contain the API token) - never commit them.
+# Commit the *.example templates instead.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.*.example

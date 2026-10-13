@@ -1,0 +1,17 @@
+export enum HttpStatus {
+  OK = 200,
+  CREATED = 201,
+  NO_CONTENT = 204,
+  BAD_REQUEST = 400,
+  UNAUTHORIZED = 401,
+  NOT_FOUND = 404,
+  CONFLICT = 409,
+  INTERNAL_SERVER_ERROR = 500,
+}
+
+/** Header the API expects for protected endpoints (per the OpenAPI spec). */
+export const AUTH_HEADER: string = 'Authentication';
+
+export const Endpoints = {
+  USERS: 'users',
+} as const;
